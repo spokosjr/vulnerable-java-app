@@ -106,23 +106,42 @@ public class VulnerableController {
     }
 
     // VULNERABILITY: Command Injection (CWE-78)
+    private static final Map<String, List<String>> ALLOWED_COMMANDS = Map.of(
+        "date", List.of("date"),
+        "whoami", List.of("whoami"),
+        "uptime", List.of("uptime")
+    );
+
     @GetMapping("/exec")
     public Map<String, Object> executeCommand(@RequestParam String cmd) {
         Map<String, Object> response = new HashMap<>();
+        List<String> command = ALLOWED_COMMANDS.get(cmd);
+
+        if (command == null) {
+            response.put("success", false);
+            response.put("error", "Command not allowed");
+            return response;
+        }
+
         try {
-            // Vulnerable: User input directly in shell command
-            Process process = Runtime.getRuntime().exec(cmd);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            ProcessBuilder pb = new ProcessBuilder(command);
+            Process process = pb.start();
             StringBuilder output = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append("\n");
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
             }
             process.waitFor();
 
             response.put("success", true);
             response.put("output", output.toString());
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            response.put("error", "Command execution was interrupted");
+        } catch (IOException e) {
             response.put("error", e.getMessage());
         }
         return response;
