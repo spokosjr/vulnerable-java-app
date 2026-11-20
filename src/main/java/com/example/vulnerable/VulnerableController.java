@@ -13,7 +13,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.security.MessageDigest;
 import java.sql.*;
 import java.util.*;
@@ -147,14 +147,19 @@ public class VulnerableController {
         return response;
     }
 
-    // VULNERABILITY: Path Traversal (CWE-22)
     @GetMapping("/files")
     public Map<String, Object> getFile(@RequestParam String filename) {
         Map<String, Object> response = new HashMap<>();
         try {
-            // Vulnerable: No sanitization of file path
-            String filePath = System.getProperty("user.dir") + "/uploads/" + filename;
-            String content = new String(Files.readAllBytes(Paths.get(filePath)));
+            Path baseDir = Paths.get(System.getProperty("user.dir"), "uploads")
+                    .toAbsolutePath()
+                    .normalize();
+            Path targetPath = baseDir.resolve(filename).normalize();
+            if (!targetPath.startsWith(baseDir)) {
+                response.put("error", "Invalid file path");
+                return response;
+            }
+            String content = Files.readString(targetPath);
             response.put("content", content);
         } catch (IOException e) {
             response.put("error", "File not found");
