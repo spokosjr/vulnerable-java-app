@@ -1,13 +1,16 @@
 ### 1η Εργασία Τεχνολογία Λογισμικού
 >Κωνσταντίνος Σπορίδης
+>
 >ΑΜ:
+>
 >https://github.com/spokosjr/vulnerable-java-app
+>
 >https://sonarcloud.io/project/overview?id=spokosjr_vulnerable-java-app
 
 
 Κατάλογος Ζητημάτων
 - ~~[Ζήτημα 1](#issues1-9)~~
-- [Ζήτημα 2]()
+- ~~[Ζήτημα 2](#issue2)~~
 - [Ζήτημα 3]()
 - [Ζήτημα 4]()
 - [Ζήτημα 5]()
@@ -24,6 +27,7 @@
 #### Ζήτημα 1# & Ζήτημα 9# {#issues1-9}
 
 >Command Injection via HTTP request parameter in VulnerableController.executeCommand()
+>
 >Either re-interrupt this method or rethrow the "InterruptedException" that can be caught here.
 
 Στο παρακάτω κομμάτι κώδικα υπάρχουν 2 προβλήματα. 
@@ -57,7 +61,6 @@
     }
 ```
 
-<h5>Τροποποιημένος Κώδικας</h5>
 
 Έγιναν οι παρακάτω αλλαγές:
 
@@ -81,6 +84,8 @@
 
 - catch (IOException e) { response.put("error", e.getMessage()); }
 Εδώ πιάνει συγκεκριμένα τα IOException που μπορεί να πετάξουν τα pb.start() και reader.readLine()
+
+<h5>Τροποποιημένος Κώδικας</h5>
 
 ```
 private static final Map<String, List<String>> ALLOWED_COMMANDS = Map.of(
@@ -123,4 +128,78 @@ private static final Map<String, List<String>> ALLOWED_COMMANDS = Map.of(
         }
         return response;
     }
+```
+
+#### Ζήτημα 2# {#issue2}
+
+>Path Traversal via HTTP request parameter in VulnerableController.getFile()
+
+Στο παρακάτω κομμάτι κώδικα υπάρχει πρόβλημα Path Traversal. Η getFile() παίρνει το filename απεθιείας από το HTTP request και την κολλάει στο τέλος του path του /uploads/ χωρίς έλεγχο. Αυτό επιτρέπει στον χρήστη να γράψει σαν filename "../arxeio" και να του επιστραφεί το περιεχόμενο του αρχείου που είναι στον γονικό φάκελο του uploads. Οπότε έτσι έχει πρόσβαση ανάγνωσης οποιουδήποτε αρχείου στο δίσκο έχει δικαιώματα ανάγνωσης η εφαρμογή Java.
+
+<h5>Αρχικός Κώδικας</h5>
+
+```
+import java.nio.file.Paths;
+
+
+// VULNERABILITY: Path Traversal (CWE-22)
+    @GetMapping("/files")
+    public Map<String, Object> getFile(@RequestParam String filename) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // Vulnerable: No sanitization of file path
+            String filePath = System.getProperty("user.dir") + "/uploads/" + filename;
+            String content = new String(Files.readAllBytes(Paths.get(filePath)));
+            response.put("content", content);
+        } catch (IOException e) {
+            response.put("error", "File not found");
+        }
+        return response;
+    }
+```
+
+Έγιναν οι παρακάτω αλλαγές:
+
+- Αρχικά τροποποιήθηκε το include της import java.nio.file.Paths σε import java.nio.file.* ώστε να μπορεί να χρησιμοποιθεί το Path object.
+
+- Path baseDir = Paths.get()
+Δημιουργία path object με το base path σε μορφή absolute path και κανονικοποίηση
+
+- Path targetPath = baseDir.resolve(filename).normalize();
+Εδώ γίνεται η ένωση του filane με το path και δημιοργείται το targetPath, με την κανονικοποίηση εκτελούνται και οι χαρακτήρες (.. .) ώστε στο επόμενο βήμα να ελεγχθεί το path. 
+
+- if (!targetPath.startsWith(baseDir))
+Εδώ γίνεται ο τελικός έλεγχος του normalized path όπου αν δεν ξεκινάει με το baseDir απορρίπτεται και επιστρέφει σφάλμα.
+
+- String content = new String(Files.readAllBytes(targetPath));
+Το Paths.get() δεν χρειάζεται πλέον καθώς το targetPath είναι ήδη Path object.
+
+<h5>Τροποποιημένος Κώδικας</h5>
+
+```
+import java.nio.file.*;
+
+
+@GetMapping("/files")
+    public Map<String, Object> getFile(@RequestParam String filename) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Path baseDir = Paths.get(System.getProperty("user.dir"), "uploads")
+                    .toAbsolutePath()
+                    .normalize();
+            Path targetPath = baseDir.resolve(filename).normalize();
+
+            if (!targetPath.startsWith(baseDir)) {
+                response.put("error", "Invalid file path");
+                return response;
+            }
+
+            String content = Files.readString(targetPath);
+            response.put("content", content);
+        } catch (IOException e) {
+            response.put("error", "File not found");
+        }
+        return response;
+    }
+
 ```
