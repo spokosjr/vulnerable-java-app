@@ -159,7 +159,7 @@ public class VulnerableController {
                 response.put("error", "Invalid file path");
                 return response;
             }
-            String content = Files.readString(targetPath);
+            String content = new String(Files.readAllBytes(targetPath));
             response.put("content", content);
         } catch (IOException e) {
             response.put("error", "File not found");
@@ -167,19 +167,27 @@ public class VulnerableController {
         return response;
     }
 
-    // VULNERABILITY: Unrestricted File Upload (CWE-434)
     @PostMapping("/upload")
     public Map<String, Object> uploadFile(@RequestParam("file") String fileContent,
                                           @RequestParam("filename") String filename) {
         Map<String, Object> response = new HashMap<>();
         try {
-            // Vulnerable: No file type validation, no size limits
-            String uploadPath = System.getProperty("user.dir") + "/uploads/" + filename;
-            Files.write(Paths.get(uploadPath), fileContent.getBytes());
+            Path baseDir = Paths.get(System.getProperty("user.dir"), "uploads")
+                    .toAbsolutePath()
+                    .normalize();
+            Path targetPath = baseDir.resolve(filename).normalize();
+
+            if (!targetPath.startsWith(baseDir)) {
+                response.put("success", false);
+                response.put("error", "Invalid file path");
+                return response;
+            }
+
+            Files.write(targetPath, fileContent.getBytes());
 
             response.put("success", true);
             response.put("filename", filename);
-            response.put("path", uploadPath);
+            response.put("path", targetPath.toString());
         } catch (IOException e) {
             response.put("error", e.getMessage());
         }

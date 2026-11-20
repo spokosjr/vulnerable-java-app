@@ -11,7 +11,7 @@
 Κατάλογος Ζητημάτων
 - ~~[Ζήτημα 1](#issues1-9)~~
 - ~~[Ζήτημα 2](#issue2)~~
-- [Ζήτημα 3]()
+- ~~[Ζήτημα 3](#issue3)~~
 - [Ζήτημα 4]()
 - [Ζήτημα 5]()
 - [Ζήτημα 6]()
@@ -202,4 +202,80 @@ import java.nio.file.*;
         return response;
     }
 
+```
+
+#### Ζήτημα 3# {#issue3}
+
+>Path Traversal via HTTP request parameter in VulnerableController.uploadFile()
+
+Στο παρακάτω κομμάτι κώδικα υπάρχει πρόβλημα Path Traversal. Η uploadFile() παίρνει το filename απεθιείας από το HTTP request και την κολλάει στο τέλος του path του /uploads/ χωρίς έλεγχο. Αυτό επιτρέπει στον χρήστη να γράψει σαν filename "../arxeio" και να ανεβάσει το αρχείο στον γονικό φάκελο του uploads. Οπότε έτσι έχει πρόσβαση εγγραφής οπουδήποτε στο δίσκο έχει δικαιώματα εγγραφής η εφαρμογή Java. Αν αντικαταστήσει κάποιο εκτελέσιμο αρχείο μπορεί να επιτευχθεί και remote code execution.
+
+<h5>Αρχικός Κώδικας</h5>
+
+```
+    // VULNERABILITY: Unrestricted File Upload (CWE-434)
+    @PostMapping("/upload")
+    public Map<String, Object> uploadFile(@RequestParam("file") String fileContent,
+                                          @RequestParam("filename") String filename) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // Vulnerable: No file type validation, no size limits
+            String uploadPath = System.getProperty("user.dir") + "/uploads/" + filename;
+            Files.write(Paths.get(uploadPath), fileContent.getBytes());
+
+            response.put("success", true);
+            response.put("filename", filename);
+            response.put("path", uploadPath);
+        } catch (IOException e) {
+            response.put("error", e.getMessage());
+        }
+        return response;
+    }
+
+```
+
+Οι αλλαγές που έγιναν είναι σχεδόν πανομοιότυπες με το [Ζήτημα 2](#issue2)
+
+- Path baseDir = Paths.get()
+Δημιουργία path object με το base path σε μορφή absolute path και κανονικοποίηση
+
+- Path targetPath = baseDir.resolve(filename).normalize();
+Εδώ γίνεται η ένωση του filane με το path και δημιοργείται το targetPath, με την κανονικοποίηση εκτελούνται και οι χαρακτήρες (.. .) ώστε στο επόμενο βήμα να ελεγχθεί το path. 
+
+- if (!targetPath.startsWith(baseDir))
+Εδώ γίνεται ο τελικός έλεγχος του normalized path όπου αν δεν ξεκινάει με το baseDir απορρίπτεται και επιστρέφει σφάλμα.
+
+- Files.write(targetPath, fileContent.getBytes());
+Το Paths.get() δεν χρειάζεται πλέον καθώς το targetPath είναι ήδη Path object.
+
+
+<h5>Τροποποιημένος Κώδικας</h5>
+
+```
+@PostMapping("/upload")
+    public Map<String, Object> uploadFile(@RequestParam("file") String fileContent,
+                                          @RequestParam("filename") String filename) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Path baseDir = Paths.get(System.getProperty("user.dir"), "uploads")
+                    .toAbsolutePath()
+                    .normalize();
+            Path targetPath = baseDir.resolve(filename).normalize();
+
+            if (!targetPath.startsWith(baseDir)) {
+                response.put("success", false);
+                response.put("error", "Invalid file path");
+                return response;
+            }
+
+            Files.writeString(targetPath, fileContent);
+
+            response.put("success", true);
+            response.put("filename", filename);
+            response.put("path", targetPath.toString());
+        } catch (IOException e) {
+            response.put("error", e.getMessage());
+        }
+        return response;
+    }
 ```
