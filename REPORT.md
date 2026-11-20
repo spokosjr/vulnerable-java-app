@@ -12,7 +12,7 @@
 - ~~[Ζήτημα 1](#issues1-9)~~
 - ~~[Ζήτημα 2](#issue2)~~
 - ~~[Ζήτημα 3](#issue3)~~
-- [Ζήτημα 4]()
+- [Ζήτημα 4](#issue4)
 - [Ζήτημα 5]()
 - [Ζήτημα 6]()
 - [Ζήτημα 7]()
@@ -278,4 +278,43 @@ import java.nio.file.*;
         }
         return response;
     }
+```
+
+#### Ζήτημα 4# {#issue4}
+
+>Reflected XSS via HTTP request parameter in VulnerableController.search()
+
+Στο παρακάτω κομμάτι κώδικα υπάρχει πρόβλημα cross site scripting, δηλαδή η είσοδος του χρήστη μέσω του query ενσωματώνεται αυτούσια στον κώδικα html χωρίς κωδικοποίηση. Αυτό έχει ως αποτέλεσμα ενας χρήστης να μπορεί να δημιουργήσει url με κακόβουλο κώδικα μέσα που θα εκτελεστεί στον browser όποιου το πατήσει. Με αυτό τον τρόπο μπορέι να γίνει επίθεση Session Hijacking κλέβοντας tokens από το localStorage του browser και πολλά ακόμα.
+
+<h5>Αρχικός Κώδικας</h5>
+
+```
+    // VULNERABILITY: Cross-Site Scripting (XSS) (CWE-79)
+    @GetMapping("/search")
+    public String search(@RequestParam String query) {
+        // Vulnerable: Reflects user input without sanitization
+        return "<h1>Search Results for: " + query + "</h1>";
+    }
+
+```
+
+Έγιναν οι παρακάτω αλλαγές:
+
+- Αρχικά προστέθηκε στα imports το  import org.springframework.web.util.HtmlUtils;
+
+- String safeQuery = HtmlUtils.htmlEscape(query);
+Με αυτή την μέθοδο όλοι οι ειδικοί χαρακτήρες της HTML μετατρέπονται σε character references πχ το & θα γίνει &amp ; ώστε κατά την επιστροφή στον κώδικα HTML να μην εκτελείται κάποιο script και απλά να εμφανίζονται οι χαρακτήρες &lt;script&gt; 
+
+<h5>Τροποποιημένος Κώδικας</h5>
+
+```
+    import org.springframework.web.util.HtmlUtils;
+
+
+    @GetMapping("/search")
+    public String search(@RequestParam String query) {
+        String safeQuery = HtmlUtils.htmlEscape(query);
+        return "<h1>Search Results for: " + safeQuery + "</h1>";
+    }
+
 ```
