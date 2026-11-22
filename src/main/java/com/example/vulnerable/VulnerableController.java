@@ -243,20 +243,15 @@ public class VulnerableController {
         return response;
     }
 
-    // VULNERABILITY: Insecure Deserialization (CWE-502)
-    @PostMapping("/deserialize")
+@PostMapping("/deserialize")
     public Map<String, Object> deserialize(@RequestBody byte[] data) {
         Map<String, Object> response = new HashMap<>();
         try {
-            // Vulnerable: Deserializing untrusted data
-            ByteArrayInputStream bis = new ByteArrayInputStream(data);
-            ObjectInputStream ois = new ObjectInputStream(bis);
-            Object obj = ois.readObject();
-            ois.close();
-
+            ObjectMapper mapper = new ObjectMapper();
+            Object obj = mapper.readValue(data, Map.class);
             response.put("result", obj.toString());
-        } catch (Exception e) {
-            response.put("error", e.getMessage());
+        } catch (IOException e) {
+            response.put("error", "Invalid JSON data: " + e.getMessage());
         }
         return response;
     }
