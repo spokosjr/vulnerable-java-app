@@ -318,3 +318,64 @@ import java.nio.file.*;
     }
 
 ```
+
+#### Ζήτημα 5# {#issue5}
+
+>Insecure Deserialization via HTTP request body in VulnerableController.deserialize()
+
+Στο παρακάτω κομμάτι κώδικα υπάρχει πρόβλημα Insecure Deserialization. Η deserialize() παίρνει δεδομένα απευθείας από το HTTP request και τα περνάει στο ObjectInputStream χωρίς κανέναν έλεγχο για το είδος ή το περιεχόμενο του αντικειμένου. Αυτό επιτρέπει σε έναν κακόβουλο χρήστη να στείλει ειδικά διαμορφωμένο Java serialized object και, κατά την αποσειριοποίηση, να ενεργοποιηθούν επικίνδυνες μέθοδοι μέσα σε classes που υπάρχουν στο classpath της εφαρμογής. Οι επιπτώσεις μπορεί να είναι Remote Code Execution με τα δικαιώματα της εφαρμογής, εκτέλεση μη αναμενόμενων ενεργειών, καθώς και Denial of Service μέσω αντικειμένων που καταναλώνουν υπερβολικούς πόρους. Επειδή το endpoint δεν κάνει authentication ή validation των δεδομένων, οποιοσδήποτε μπορεί να επιχειρήσει την επίθεση στέλνοντας ένα HTTP request.
+
+<h5>Αρχικός Κώδικας</h5>
+
+```
+    // VULNERABILITY: Insecure Deserialization (CWE-502)
+    @PostMapping("/deserialize")
+    public Map<String, Object> deserialize(@RequestBody byte[] data) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // Vulnerable: Deserializing untrusted data
+            ByteArrayInputStream bis = new ByteArrayInputStream(data);
+            ObjectInputStream ois = new ObjectInputStream(bis);
+            Object obj = ois.readObject();
+            ois.close();
+
+            response.put("result", obj.toString());
+        } catch (Exception e) {
+            response.put("error", e.getMessage());
+        }
+        return response;
+    }
+
+```
+
+Έγιναν οι παρακάτω αλλαγές:
+
+- Αρχικά αφαιρέθηκε η χρήση των ByteArrayInputStream και ObjectInputStream, επειδή το native Java deserialization δεν πρέπει να χρησιμοποιείται για δεδομένα που προέρχονται από τον χρήστη.
+
+- ObjectMapper mapper = new ObjectMapper();
+Δημιουργία ObjectMapper για την ανάγνωση δεδομένων JSON αντί για Java serialized objects. Το JSON είναι μορφή δεδομένων και δεν περιέχει τις ίδιες δυνατότητες εκτέλεσης κώδικα που έχει η αποσειριοποίηση αυθαίρετων Java objects.
+
+- Object obj = mapper.readValue(data, Map.class);
+Τα δεδομένα μετατρέπονται αποκλειστικά σε Map, οπότε δεν επιτρέπεται η δημιουργία αυθαίρετου Java object ή η φόρτωση class από το input του χρήστη. Αν τα δεδομένα δεν είναι έγκυρο JSON, η μετατροπή αποτυγχάνει.
+
+- catch (IOException e) { ... }
+Πιάνεται συγκεκριμένα η IOException που μπορεί να προκύψει όταν τα δεδομένα δεν είναι έγκυρο JSON και επιστρέφεται μήνυμα σφάλματος, χωρίς να διακόπτεται η λειτουργία της εφαρμογής.
+
+
+
+<h5>Τροποποιημένος Κώδικας</h5>
+
+```
+@PostMapping("/deserialize")
+    public Map<String, Object> deserialize(@RequestBody byte[] data) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            Object obj = mapper.readValue(data, Map.class);
+            response.put("result", obj.toString());
+        } catch (IOException e) {
+            response.put("error", "Invalid JSON data: " + e.getMessage());
+        }
+        return response;
+    }
+```
