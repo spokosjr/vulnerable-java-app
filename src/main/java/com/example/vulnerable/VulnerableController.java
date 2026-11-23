@@ -363,13 +363,13 @@ public class VulnerableController {
 
     @GetMapping("/token")
     public Map<String, Object> getToken() {
-        String token = "";
+        StringBuilder token = new StringBuilder(16);
         for (int i = 0; i < 16; i++) {
-            token += (char) ('a' + SECURE_RANDOM.nextInt(26));
+            token.append((char) ('a' + SECURE_RANDOM.nextInt(26)));
         }
 
         Map<String, Object> response = new HashMap<>();
-        response.put("token", token);
+        response.put("token", token.toString());
         return response;
     }
     
