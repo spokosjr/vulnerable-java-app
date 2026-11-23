@@ -18,7 +18,7 @@
 - ~~[Ζήτημα 7](#issue7)~~
 - ~~[Ζήτημα 8](#ζήτημα-8-issue8)~~
 - ~~[Ζήτημα 9](#issues1-9)~~
-- [Ζήτημα 10]()
+- ~~[Ζήτημα 10](#issue10)~~
 - [Ζήτημα 11]()
 - [Ζήτημα 12]()
 - [Ζήτημα 13]()
@@ -580,4 +580,37 @@ import javax.crypto.*;
             }
         };
     }
+```
+
+#### Ζήτημα 10# {#issue10}
+
+>Make sure this debug feature is deactivated before delivering the code in production.
+
+Στο παρακάτω κομμάτι του config αρχείου application.properties είναι ενεργοποιημένο το debug καθώς τα logging επίπεδα της εφαρμογής και του spring. 
+
+<h5>Αρχικός Κώδικας</h5>
+
+```
+# VULNERABILITY: Debug mode enabled (CWE-489)
+debug=true
+logging.level.root=DEBUG
+logging.level.org.springframework.web=DEBUG
+
+```
+
+Έγιναν οι παρακάτω αλλαγές:
+
+- Αλλαγή του boolean debug από true σε false
+
+- logging.level.root=INFO περιορισμός του logging σε κανονικά μηνύματα πχ εκκίνηση εφαρμογής και σημαντικά συμβάντα
+
+- logging.level.org.springframework.web=WARN περιορισμός των logs του spring web σε προειδοποιήσεις και σφάλματα
+
+
+<h5>Τροποποιημένος Κώδικας</h5>
+
+```
+debug=false
+logging.level.root=INFO
+logging.level.org.springframework.web=WARN
 ```
