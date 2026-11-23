@@ -19,9 +19,11 @@
 - ~~[Ζήτημα 8](#ζήτημα-8-issue8)~~
 - ~~[Ζήτημα 9](#issues1-9)~~
 - ~~[Ζήτημα 10](#issue10)~~
-- [Ζήτημα 11]()
-- [Ζήτημα 12]()
-- [Ζήτημα 13]()
+- ~~[Ζήτημα 11](#issue11)~~
+- ~~[Ζήτημα 12](#issue12)~~
+- [Ζήτημα 13](#issue13)
+
+Δυστυχώς τα issues 11,12 και 13 δεν τα βρήκε ποτέ το SonarQube οπότε με βάση την εκφώνηση της άσκησης βρέθηκαν με Ctrl + F στον κώδικα.
 
 
 #### Ζήτημα 1# & Ζήτημα 9# {#issues1-9}
@@ -617,6 +619,8 @@ logging.level.org.springframework.web=WARN
 
 #### Ζήτημα 11# {#issue11}
 
+Βρέθηκε με ctrl + F χρησιμοποιώντας "System.out"
+
 >Replace this use of System.out by a logger.
 
 Στο παρακάτω κομμάτι κώδικα υπάρχει πρόβλημα με την εκτύπωση του query με System.out.println, το print δεν έχει timestamps ούτε log levels.
@@ -696,6 +700,58 @@ logging.level.org.springframework.web=WARN
 
         response.put("success", false);
         response.put("message", "Invalid credentials");
+        return response;
+    }
+
+```
+
+#### Ζήτημα 12# {#issue12}
+
+Βρέθηκε με ctrl + F χρησιμοποιώντας "(Exception e)"
+Υπήρξαν αρκετά αποτελέσματα και επέλεξα την errorTest().
+
+>Replace generic exceptions with specific library exceptions or a custom exception.
+
+Στο παρακάτω κομμάτι κώδικα υπάρχουν 2 προβλήματα. Αρχικά το μήυμα σφάλματος εμπεριέχει ευαίσθητα credentials. Το κύριο πρόβλημα είναι το γενικό catch (Exception e) που δυσκολέυει την διαχείριση του σφάλματος από τον κώδικα που καλεί την errorTest().
+
+<h5>Αρχικός Κώδικας</h5>
+
+```
+    // VULNERABILITY: Information Disclosure through Error Messages (CWE-209)
+    @GetMapping("/error-test")
+    public Map<String, Object> errorTest() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            throw new Exception("Database connection failed: jdbc:mysql://admin:password@localhost:3306/mydb");
+        } catch (Exception e) {
+            // Vulnerable: Exposes sensitive information in error message
+            response.put("error", e.getMessage());
+            response.put("stackTrace", Arrays.toString(e.getStackTrace()));
+        }
+        return response;
+    }
+    
+```
+
+Έγιναν οι παρακάτω αλλαγές:
+
+- throw new SQLException("Database connection failed");
+Αφαιρέθηκαν τα credentials από το μήνυμα του exception
+
+- catch (SQLException e)
+Αλλάχθηκε το γενικό exception με το SQLException 
+
+<h5>Τροποποιημένος Κώδικας</h5>
+
+```
+   @GetMapping("/error-test")
+    public Map<String, Object> errorTest() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            throw new SQLException("Database connection failed");
+        } catch (SQLException e) {
+            response.put("error", e.getMessage());
+        }
         return response;
     }
 

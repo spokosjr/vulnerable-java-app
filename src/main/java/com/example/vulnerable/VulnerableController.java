@@ -388,17 +388,13 @@ public class VulnerableController {
         }
         response.sendRedirect(targetUrl);
     }
-
-    // VULNERABILITY: Information Disclosure through Error Messages (CWE-209)
     @GetMapping("/error-test")
     public Map<String, Object> errorTest() {
         Map<String, Object> response = new HashMap<>();
         try {
-            throw new Exception("Database connection failed: jdbc:mysql://admin:password@localhost:3306/mydb");
-        } catch (Exception e) {
-            // Vulnerable: Exposes sensitive information in error message
+            throw new SQLException("Database connection failed");
+        } catch (SQLException e) {
             response.put("error", e.getMessage());
-            response.put("stackTrace", Arrays.toString(e.getStackTrace()));
         }
         return response;
     }
