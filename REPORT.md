@@ -15,7 +15,7 @@
 - ~~[Ζήτημα 4](#issue4)~~
 - ~~[Ζήτημα 5](#issue5)~~
 - ~~[Ζήτημα 6](#issue6)~~
-- [Ζήτημα 7]()
+- [Ζήτημα 7](#issue7)
 - [Ζήτημα 8]()
 - ~~[Ζήτημα 9](#issues1-9)~~
 - [Ζήτημα 10]()
@@ -428,5 +428,94 @@ private static final Map<String, String> ALLOWED_REDIRECTS = Map.of(
             return;
         }
         response.sendRedirect(targetUrl);
+    }
+```
+
+#### Ζήτημα 7# {#issue7}
+
+>Make sure this weak hash algorithm is not used in a sensitive context here.
+
+Στο παρακάτω κομμάτι κώδικα υπάρχει πρόβλημα από την χρήση του αλγορίθμου MD5. Ο αλγόριθμος αυτός, παρουσιάζει κρυπτογραφικές ευπάθειες όπως collisions και λόγω του ταχύτατου υπολογισμού του είναι ακατάλληλος για χρήση σε passwords. Σε μια σύγχρονη GPU μπορούν με bruteforce να σπάσουν οι περισσότεροι κωδικοί σε ελάχιστο χρόνο.
+
+<h5>Αρχικός Κώδικας</h5>
+
+```
+    // VULNERABILITY: Weak Cryptography (CWE-327)
+    @PostMapping("/hash")
+    public Map<String, Object> hashPassword(@RequestBody Map<String, String> request) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            String password = request.get("password");
+            // Vulnerable: Using weak hash algorithm (MD5)
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] hash = md.digest(password.getBytes());
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                hexString.append(String.format("%02x", b));
+            }
+
+            response.put("hash", hexString.toString());
+            response.put("algorithm", "MD5");
+        } catch (Exception e) {
+            response.put("error", e.getMessage());
+        }
+        return response;
+    }
+```
+Αντικαταστάθηκε ο MD5 με τον PBKDF2WithHmacSHA256, στον κώδικα έγιναν οι παρακάτω αλλαγές:
+
+- if (password == null || password.isEmpty())
+Έλεγχος οτι δώθηκε κωδικός για να αποφύγουμε το NullPointerException
+
+- byte[] salt = new byte[16]; και new SecureRandom().nextBytes(salt);
+Δημιουργία Κρυπτογραφικά ασφαλές salt 16 bytes
+
+- PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 256);
+Ορίζουμε τις παραμέτρους του αλγορίθμου, τον κωδικό, το salt, τις επαναλήψεις και το μήκος της εξόδου.
+
+- SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+Επιλογή του αλγορίθμου PBKDF2WithHmacSHA256
+
+- byte[] hash = factory.generateSecret(spec).getEncoded();
+Εκτελεί το hashing και παίρνει τα bytes του hash.
+
+- Base64.getEncoder().encodeToString()
+Κωδικοποίηση του hash και του salt σε Base64 για να σταλέι σε JSON
+
+- catch (NoSuchAlgorithmException | InvalidKeySpecException e)
+Πιάνει τα συγκεκριμένα exceptions που μπορεί να προκύψουν αντί για το γενικό.
+
+<h5>Τροποποιημένος Κώδικας</h5>
+
+```
+import java.security.spec.InvalidKeySpecException;
+import javax.crypto.spec.PBEKeySpec;
+import java.security.*;
+import javax.crypto.*;
+
+@PostMapping("/hash")
+    public Map<String, Object> hashPassword(@RequestBody Map<String, String> request) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            String password = request.get("password");
+            if (password == null || password.isEmpty()) {
+                response.put("error", "Password is required");
+                return response;
+            }
+
+            byte[] salt = new byte[16];
+            new SecureRandom().nextBytes(salt);
+
+            PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 256);
+            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            byte[] hash = factory.generateSecret(spec).getEncoded();
+
+            response.put("salt", Base64.getEncoder().encodeToString(salt));
+            response.put("hash", Base64.getEncoder().encodeToString(hash));
+            response.put("algorithm", "PBKDF2WithHmacSHA256");
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+            response.put("error", e.getMessage());
+        }
+        return response;
     }
 ```
