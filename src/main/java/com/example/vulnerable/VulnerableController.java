@@ -11,6 +11,8 @@ import javax.crypto.spec.PBEKeySpec;
 import java.security.*;
 import javax.crypto.*;
 
+import org.slf4j.*;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.parsers.DocumentBuilder;
@@ -28,6 +30,8 @@ import java.util.*;
  * Intentionally Vulnerable REST Controller
  * DO NOT USE IN PRODUCTION - FOR SECURITY TESTING ONLY
  */
+
+
 @RestController
 @RequestMapping("/api")
 public class VulnerableController {
@@ -83,6 +87,8 @@ public class VulnerableController {
                 </html>
                 """;
     }
+    
+    private static final Logger logger = LoggerFactory.getLogger(VulnerableController.class);
 
     // VULNERABILITY: SQL Injection (CWE-89)
     @PostMapping("/login")
@@ -92,7 +98,8 @@ public class VulnerableController {
 
         // Vulnerable: Direct string concatenation simulating SQL injection
         String query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
-        System.out.println("Query: " + query);  // This would be vulnerable in real SQL
+        
+        logger.debug("Query: {}", query);
 
         Map<String, Object> response = new HashMap<>();
         for (Map<String, Object> user : users) {
