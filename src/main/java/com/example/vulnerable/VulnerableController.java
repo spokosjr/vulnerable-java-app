@@ -354,14 +354,11 @@ public class VulnerableController {
         return response;
     }
 
-    // VULNERABILITY: Insecure Randomness (CWE-330)
     @GetMapping("/token")
     public Map<String, Object> getToken() {
-        // Vulnerable: Random is not cryptographically secure
-        Random random = new Random();
         String token = "";
         for (int i = 0; i < 16; i++) {
-            token += (char) ('a' + random.nextInt(26));
+            token += (char) ('a' + SECURE_RANDOM.nextInt(26));
         }
 
         Map<String, Object> response = new HashMap<>();

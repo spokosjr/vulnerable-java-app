@@ -465,7 +465,8 @@ private static final Map<String, String> ALLOWED_REDIRECTS = Map.of(
 Αντικαταστάθηκε ο MD5 με τον PBKDF2WithHmacSHA256, στον κώδικα έγιναν οι παρακάτω αλλαγές:
 
 - private static final SecureRandom SECURE_RANDOM = new SecureRandom();
-Δημιουργία του SECURE_RANDOM object για επαναχρησιμοποίηση στον κώδικα και επίλυση του (Save and re-use this "Random".) σφάλματος που δημιουργήθηκε με το προηγούμενο commit.
+Δημιουργία του SECURE_RANDOM object για επαναχρησιμοποίηση στον κώδικα και επίλυση του (Save and re-use this "Random".) issue που δημιουργήθηκε με το προηγούμενο commit.
+Έγινε αλλαγή και στην getToken για χρήση του SECURE_RANDOM object καθώς εμφανοζόνταν και εκεί το ίδιο issue.
 
 - if (password == null || password.isEmpty())
 Έλεγχος οτι δώθηκε κωδικός για να αποφύγουμε το NullPointerException
