@@ -756,3 +756,56 @@ logging.level.org.springframework.web=WARN
     }
 
 ```
+
+#### Ζήτημα 13# {#issue13}
+
+Βρέθηκε με ctrl + F χρησιμοποιώντας "+="
+
+>Use a StringBuilder instead.
+
+Στο παρακάτω κομμάτι κώδικα γίνεται με λάθος τρόπο η συνένωση των String. Χρησιμοποιείται ένα += σε for loop. Επειδή στην Java τα αντικείμενα String ειναι immutable σε κάθε loop δημιουργείται καινούριο object στην μνήμη και αντιγράφεται το περιεχόμενο του προηγούμενοθυ. Αυτό έχει ως αποτέλεσμα αυξημένη κατανάλωση μνήμης καθώς και κακή απόδοση (πολυωνυμικός χρόνος).
+
+<h5>Αρχικός Κώδικας</h5>
+
+```
+    @GetMapping("/token")
+    public Map<String, Object> getToken() {
+        String token = "";
+        for (int i = 0; i < 16; i++) {
+            token += (char) ('a' + SECURE_RANDOM.nextInt(26));
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("token", token);
+        return response;
+    }
+    
+```
+
+Έγιναν οι παρακάτω αλλαγές:
+
+- StringBuilder token = new StringBuilder(16);
+Δημιουργία μεταβλητού buffer 16 χαρακτήρες
+
+- token.append();
+Προσθήκη νέου χαρακτήρα στο τέλος του buffer (σταθερός χρόνος)
+
+- response.put("token", token.toString());
+Μετατροπή του StingBuilder σε String μόνο μια φορά στο τέλος.
+
+<h5>Τροποποιημένος Κώδικας</h5>
+
+```
+@GetMapping("/token")
+    public Map<String, Object> getToken() {
+        StringBuilder token = new StringBuilder(16);
+        for (int i = 0; i < 16; i++) {
+            token.append((char) ('a' + SECURE_RANDOM.nextInt(26)));
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("token", token.toString());
+        return response;
+    }
+
+```
