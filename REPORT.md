@@ -464,10 +464,14 @@ private static final Map<String, String> ALLOWED_REDIRECTS = Map.of(
 ```
 Αντικαταστάθηκε ο MD5 με τον PBKDF2WithHmacSHA256, στον κώδικα έγιναν οι παρακάτω αλλαγές:
 
+- private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+Δημιουργία του SECURE_RANDOM object για επαναχρησιμοποίηση στον κώδικα και επίλυση του (Save and re-use this "Random".) issue που δημιουργήθηκε με το προηγούμενο commit.
+Έγινε αλλαγή και στην getToken για χρήση του SECURE_RANDOM object καθώς εμφανοζόνταν και εκεί το ίδιο issue.
+
 - if (password == null || password.isEmpty())
 Έλεγχος οτι δώθηκε κωδικός για να αποφύγουμε το NullPointerException
 
-- byte[] salt = new byte[16]; και new SecureRandom().nextBytes(salt);
+- byte[] salt = new byte[16]; και SECURE_RANDOM.nextBytes(salt);
 Δημιουργία Κρυπτογραφικά ασφαλές salt 16 bytes
 
 - PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 256);
@@ -493,7 +497,9 @@ import javax.crypto.spec.PBEKeySpec;
 import java.security.*;
 import javax.crypto.*;
 
-@PostMapping("/hash")
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    @PostMapping("/hash")
     public Map<String, Object> hashPassword(@RequestBody Map<String, String> request) {
         Map<String, Object> response = new HashMap<>();
         try {
@@ -504,7 +510,7 @@ import javax.crypto.*;
             }
 
             byte[] salt = new byte[16];
-            new SecureRandom().nextBytes(salt);
+            SECURE_RANDOM.nextBytes(salt);
 
             PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 256);
             SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");

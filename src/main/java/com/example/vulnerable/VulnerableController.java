@@ -354,14 +354,11 @@ public class VulnerableController {
         return response;
     }
 
-    // VULNERABILITY: Insecure Randomness (CWE-330)
     @GetMapping("/token")
     public Map<String, Object> getToken() {
-        // Vulnerable: Random is not cryptographically secure
-        Random random = new Random();
         String token = "";
         for (int i = 0; i < 16; i++) {
-            token += (char) ('a' + random.nextInt(26));
+            token += (char) ('a' + SECURE_RANDOM.nextInt(26));
         }
 
         Map<String, Object> response = new HashMap<>();
@@ -399,6 +396,8 @@ public class VulnerableController {
         return response;
     }
 
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     @PostMapping("/hash")
     public Map<String, Object> hashPassword(@RequestBody Map<String, String> request) {
         Map<String, Object> response = new HashMap<>();
@@ -410,7 +409,7 @@ public class VulnerableController {
             }
 
             byte[] salt = new byte[16];
-            new SecureRandom().nextBytes(salt);
+            SECURE_RANDOM.nextBytes(salt);
 
             PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 256);
             SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
