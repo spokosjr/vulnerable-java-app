@@ -614,3 +614,89 @@ debug=false
 logging.level.root=INFO
 logging.level.org.springframework.web=WARN
 ```
+
+#### Ζήτημα 11# {#issue11}
+
+>Replace this use of System.out by a logger.
+
+Στο παρακάτω κομμάτι κώδικα υπάρχει πρόβλημα με την εκτύπωση του query με System.out.println, το print δεν έχει timestamps ούτε log levels.
+
+<h5>Αρχικός Κώδικας</h5>
+
+```
+    // VULNERABILITY: SQL Injection (CWE-89)
+    @PostMapping("/login")
+    public Map<String, Object> login(@RequestBody Map<String, String> credentials) {
+        String username = credentials.get("username");
+        String password = credentials.get("password");
+
+        // Vulnerable: Direct string concatenation simulating SQL injection
+        String query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
+        System.out.println("Query: " + query);  // This would be vulnerable in real SQL
+
+        Map<String, Object> response = new HashMap<>();
+        for (Map<String, Object> user : users) {
+            if (user.get("username").equals(username)) {
+                // VULNERABILITY: Weak JWT with predictable secret (CWE-327)
+                String token = "fake_jwt_token_" + username + "_" + System.currentTimeMillis();
+                response.put("success", true);
+                response.put("token", token);
+                response.put("user", user);
+                return response;
+            }
+        }
+
+        response.put("success", false);
+        response.put("message", "Invalid credentials");
+        return response;
+    }
+```
+
+Έγιναν οι παρακάτω αλλαγές:
+
+- import org.slf4j.*; το slf4j υπάρχει στο spingboot και έχει ενσωματωμένο Logger
+
+- private static final Logger logger = LoggerFactory.getLogger(VulnerableController.class);
+Δημιουργία logger για την κλάση VulnerableController οπότε κάθε μήνμυα θα φέρει αυτόματα ώρα, επίπεδο και πηγή.
+
+- logger.debug("Query: {}", query);
+Αντικατάσταση System.out.println με τον logger σε επίπεδο debug.
+
+<h5>Τροποποιημένος Κώδικας</h5>
+
+```
+    import org.slf4j.*;
+
+
+
+    private static final Logger logger = LoggerFactory.getLogger(VulnerableController.class);
+
+    // VULNERABILITY: SQL Injection (CWE-89)
+    @PostMapping("/login")
+    public Map<String, Object> login(@RequestBody Map<String, String> credentials) {
+        String username = credentials.get("username");
+        String password = credentials.get("password");
+
+        // Vulnerable: Direct string concatenation simulating SQL injection
+        String query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'";
+        
+        logger.debug("Query: {}", query);
+
+        Map<String, Object> response = new HashMap<>();
+        for (Map<String, Object> user : users) {
+            if (user.get("username").equals(username)) {
+                // VULNERABILITY: Weak JWT with predictable secret (CWE-327)
+                String token = "fake_jwt_token_" + username + "_" + System.currentTimeMillis();
+                response.put("success", true);
+                response.put("token", token);
+                response.put("user", user);
+                return response;
+            }
+        }
+
+        response.put("success", false);
+        response.put("message", "Invalid credentials");
+        return response;
+    }
+
+```
