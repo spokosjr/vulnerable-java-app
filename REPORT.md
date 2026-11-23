@@ -15,8 +15,8 @@
 - ~~[Ζήτημα 4](#issue4)~~
 - ~~[Ζήτημα 5](#issue5)~~
 - ~~[Ζήτημα 6](#issue6)~~
-- [Ζήτημα 7](#issue7)
-- [Ζήτημα 8]()
+- ~~[Ζήτημα 7](#issue7)~~
+- ~~[Ζήτημα 8](#ζήτημα-8-issue8)~~
 - ~~[Ζήτημα 9](#issues1-9)~~
 - [Ζήτημα 10]()
 - [Ζήτημα 11]()
@@ -523,5 +523,61 @@ import javax.crypto.*;
             response.put("error", e.getMessage());
         }
         return response;
+    }
+```
+
+#### Ζήτημα 8# {#issue8}
+
+>Make sure that enabling CORS is safe here.
+
+Στο παρακάτω κομμάτι κώδικα υπάρχει πρόβλημα με τις ρυθμίσεις του CORS. Συγκεκριμένα επιτρέπονται request από οποιοδήποτε domain με όλες τις μεθόδους http Και όλα τα headers, ταυτόχρονα είναι ενεργό και το allowCredentials. Αυτό επιτρέπει σε οποιοδήποτε domain να διαβάζει δεδομένα από την εφαρμογή μας (μέσω του browser του χρήστη) και λόγω του allowCredentials μπορεί να εκτελέσει εντολές για λογαριασμό του χρήστη λαμβάνοντας πίσω και την απάντηση.
+
+<h5>Αρχικός Κώδικας</h5>
+
+```
+@Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                registry.addMapping("/**")
+                        .allowedOrigins("*")  // Allows any origin
+                        .allowedMethods("*")  // Allows all HTTP methods
+                        .allowedHeaders("*")  // Allows all headers
+                        .allowCredentials(true);  // Dangerous with wildcard origin
+            }
+        };
+    }
+```
+
+Έγιναν οι παρακάτω αλλαγές:
+- .allowedOrigins("https://trusted.example.com")
+Η πιο σημαντική αλλαγή καθώς επιτρέπει μόνο σε συγκεκριμένο domain να έχει πρόσβαση στα δεδομένα της εφαρμογής μας
+
+- .allowedMethods("GET", "POST", "PUT", "DELETE")
+Επιτρέπει συγκεκριμένες μεθόδους HTTP
+
+- .allowedHeaders("Content-Type", "Authorization")
+Επιτρέπει συγκεκριμένα headers
+
+- .allowCredentials(true)
+Τώρα είναι ασφαλής η χρήση του εφόσον κάθε επιτρεπόμενο request Θα προέρχεται από έμπιστο domains
+
+
+<h5>Τροποποιημένος Κώδικας</h5>
+
+```
+@Bean
+    public WebMvcConfigurer corsConfigurer() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                registry.addMapping("/**")
+                        .allowedOrigins("https://trusted.example.com")
+                        .allowedMethods("GET", "POST", "PUT", "DELETE")
+                        .allowedHeaders("Content-Type", "Authorization")
+                        .allowCredentials(true);
+            }
+        };
     }
 ```
