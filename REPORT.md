@@ -13,8 +13,8 @@
 - ~~[Ζήτημα 2](#issue2)~~
 - ~~[Ζήτημα 3](#issue3)~~
 - ~~[Ζήτημα 4](#issue4)~~
-- [Ζήτημα 5]()
-- [Ζήτημα 6]()
+- ~~[Ζήτημα 5](#issue5)~~
+- [Ζήτημα 6](#issue6)
 - [Ζήτημα 7]()
 - [Ζήτημα 8]()
 - ~~[Ζήτημα 9](#issues1-9)~~
@@ -377,5 +377,56 @@ import java.nio.file.*;
             response.put("error", "Invalid JSON data: " + e.getMessage());
         }
         return response;
+    }
+```
+
+#### Ζήτημα 6# {#issue6}
+
+>Open Redirect via HTTP request parameter in VulnerableController.redirect()
+
+Στο παρακάτω κομμάτι κώδικα υπάρχει πρόβλημα Open Redirect. Αυτό συμβαίνει γιατί ο κώδικας παίρνει αυτούσιο το url από το http request και το στέλνει κατευθείαν στον browser του χρήστη σαν redirect. Αυτό επιτρέπει σε κάποιον κακόβουλο να δημιοργήσει ενα link που ξεκινάει με το domain της εφαρμογής και επειδή φαίνεται έμπιστο στον χρήστη το πατάει αλλά μπορεί να καταλήγει σε phishing site, επίσης μπορεί να γίνει υποκλοπή token από το local storage του browser.
+
+<h5>Αρχικός Κώδικας</h5>
+
+```
+    // VULNERABILITY: Open Redirect (CWE-601)
+    @GetMapping("/redirect")
+    public void redirect(@RequestParam String url, HttpServletResponse response) throws IOException {
+        // Vulnerable: No validation of redirect URL
+        response.sendRedirect(url);
+    }
+```
+
+Η επίλυση είναι παρόμοια με το [Ζήτημα 1](#issues1-9). Συγκεκριμένα έγιναν οι παρακάτω αλλαγές:
+
+- private static final Map<String, String> ALLOWED_REDIRECTS
+Ορισμός σταθερής λίστας επιτρεπόμενων redirect
+
+- String targetUrl = ALLOWED_REDIRECTS.get(url);
+Αντί να σταλεί η είσοδος του χρήστη στον browser σαν redirect στέλνεται (αν βρεθεί αντιστοιχία) η τιμή από την λίστα
+
+- if (targetUrl == null) { ... return response; }
+Αν δεν βρεθεί αντιστοιχία στην λίστα, επιστρέφεται σφάλμα HTTP 400 Bad Request και δεν εκτελέιται redirect
+
+- response.sendRedirect(targetUrl);
+Εκτελείται redirect με την τιμή από την λίστα μας.
+
+<h5>Τροποποιημένος Κώδικας</h5>
+
+```
+private static final Map<String, String> ALLOWED_REDIRECTS = Map.of(
+        "home", "/",
+        "search", "/search",
+        "files", "/files"
+    );
+
+    @GetMapping("/redirect")
+    public void redirect(@RequestParam String url, HttpServletResponse response) throws IOException {
+        String targetUrl = ALLOWED_REDIRECTS.get(url);
+        if (targetUrl == null) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid redirect URL");
+            return;
+        }
+        response.sendRedirect(targetUrl);
     }
 ```

@@ -363,12 +363,21 @@ public class VulnerableController {
         response.put("token", token);
         return response;
     }
+    
+    private static final Map<String, String> ALLOWED_REDIRECTS = Map.of(
+        "home", "/",
+        "search", "/search",
+        "files", "/files"
+    );
 
-    // VULNERABILITY: Open Redirect (CWE-601)
     @GetMapping("/redirect")
     public void redirect(@RequestParam String url, HttpServletResponse response) throws IOException {
-        // Vulnerable: No validation of redirect URL
-        response.sendRedirect(url);
+        String targetUrl = ALLOWED_REDIRECTS.get(url);
+        if (targetUrl == null) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Invalid redirect URL");
+            return;
+        }
+        response.sendRedirect(targetUrl);
     }
 
     // VULNERABILITY: Information Disclosure through Error Messages (CWE-209)
