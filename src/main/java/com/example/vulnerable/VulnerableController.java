@@ -399,6 +399,8 @@ public class VulnerableController {
         return response;
     }
 
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     @PostMapping("/hash")
     public Map<String, Object> hashPassword(@RequestBody Map<String, String> request) {
         Map<String, Object> response = new HashMap<>();
@@ -410,7 +412,7 @@ public class VulnerableController {
             }
 
             byte[] salt = new byte[16];
-            new SecureRandom().nextBytes(salt);
+            SECURE_RANDOM.nextBytes(salt);
 
             PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 256);
             SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
