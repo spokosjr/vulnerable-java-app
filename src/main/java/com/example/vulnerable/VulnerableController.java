@@ -6,6 +6,11 @@ import org.springframework.web.util.HtmlUtils;
 import org.w3c.dom.Document;
 import org.yaml.snakeyaml.Yaml;
 
+import java.security.spec.InvalidKeySpecException;
+import javax.crypto.spec.PBEKeySpec;
+import java.security.*;
+import javax.crypto.*;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.parsers.DocumentBuilder;
@@ -394,23 +399,27 @@ public class VulnerableController {
         return response;
     }
 
-    // VULNERABILITY: Weak Cryptography (CWE-327)
     @PostMapping("/hash")
     public Map<String, Object> hashPassword(@RequestBody Map<String, String> request) {
         Map<String, Object> response = new HashMap<>();
         try {
             String password = request.get("password");
-            // Vulnerable: Using weak hash algorithm (MD5)
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] hash = md.digest(password.getBytes());
-            StringBuilder hexString = new StringBuilder();
-            for (byte b : hash) {
-                hexString.append(String.format("%02x", b));
+            if (password == null || password.isEmpty()) {
+                response.put("error", "Password is required");
+                return response;
             }
 
-            response.put("hash", hexString.toString());
-            response.put("algorithm", "MD5");
-        } catch (Exception e) {
+            byte[] salt = new byte[16];
+            new SecureRandom().nextBytes(salt);
+
+            PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 65536, 256);
+            SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+            byte[] hash = factory.generateSecret(spec).getEncoded();
+
+            response.put("salt", Base64.getEncoder().encodeToString(salt));
+            response.put("hash", Base64.getEncoder().encodeToString(hash));
+            response.put("algorithm", "PBKDF2WithHmacSHA256");
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
             response.put("error", e.getMessage());
         }
         return response;
